@@ -2,6 +2,8 @@ const s3 = require('s3-client');
 const ProgressBar = require('progress');
 const _ = require('lodash');
 const aws = require('aws-sdk');
+const path = require('path');
+const packageJson = require('./package.json');
 
 const UPLOAD_IGNORES = ['.DS_Store'];
 
@@ -53,6 +55,7 @@ module.exports = class S3Plugin {
       s3Options = {},
       s3UploadOptions = {},
       cloudfrontInvalidateOptions = {},
+      additionalFiles = [],
     } = options;
 
     const basePath = options.basePath ? addTrailingS3Sep(options.basePath) : '';
@@ -64,6 +67,7 @@ module.exports = class S3Plugin {
       include,
       exclude,
       basePath,
+      additionalFiles,
       progress: _.isBoolean(progress) ? progress : true,
     };
 
@@ -83,13 +87,16 @@ module.exports = class S3Plugin {
     this.options.directory =
       compiler.options.output.path || compiler.options.output.context || '.';
 
-    compiler.plugin('after-emit', (compilation, cb) => {
+    compiler.hooks.afterEmit.tapAsync(packageJson.name, (compilation, cb) => {
       if (!hasRequiredUploadOpts) {
         const error = `S3Plugin-RequiredS3UploadOpts: ${REQUIRED_S3_UP_OPTS.join(', ')}`;
         handleErrors(error, compilation, cb);
       }
 
+      const additionalFiles = [].concat(this.options.additionalFiles).filter(Boolean);
+
       getAssetFiles(compilation)
+        .then(files => files.concat(additionalFiles))
         .then(files => this.filterAllowedFiles(files))
         .then(files => this.uploadFiles(files))
         .then(() => this.invalidateCloudfront())
@@ -179,7 +186,7 @@ module.exports = class S3Plugin {
     // eslint-disable-next-line no-param-reassign
     fileName = fileName.split('../').join('');
 
-    let Key = this.options.basePath + fileName;
+    let Key = path.join(this.options.basePath, fileName);
     const s3Params = _.mapValues(
       this.uploadOptions,
       optionConfig => // eslint-disable-line no-confusing-arrow
@@ -190,6 +197,8 @@ module.exports = class S3Plugin {
     if (Key[0] === '/') {
       Key = Key.substr(1);
     }
+
+    Key = path.posix.normalize(Key).replace(/\\/g, '/');
 
     // Remove Gzip from encoding if ico
     if (/\.ico/.test(fileName) && s3Params.ContentEncoding === 'gzip') {

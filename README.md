@@ -64,6 +64,20 @@ It is required to set:
 - `s3UploadOptions`: Provide upload options [putObject](http://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html#putObject-property )
 - `basePath`: Provide the namespace where upload files on S3
 - `progress`: Enable progress bar (defaults true)
+- `additionalFiles`: List of additional files for upload:
+```javascript
+new S3Uploader({
+  // ...
+  additionalFiles: [
+    {
+      // full path to file
+      path: '/usr/home/my-repo/static/icons/icon.svg',
+      // s3 file url
+      name: 'icons/icon.svg',
+    }
+  ]
+});
+```
 
 ##### Advanced `include` and `exclude rules`
 
